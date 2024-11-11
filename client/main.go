@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"io"
+	"log"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -20,5 +20,9 @@ func main() {
 		panic(err)
 	}
 	defer res.Body.Close()
-	io.Copy(os.Stdout, res.Body)
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		panic(err)
+	}
+	log.Println(string(body))
 }

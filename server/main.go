@@ -3,46 +3,38 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
 	"time"
 )
 
-type CotacaoResponse struct {
-	Bid string `json:"bid"`
-}
-
 type Exchange struct {
 	Usdbrl struct {
-		Code       string `json:"code"`
-		Codein     string `json:"codein"`
-		Name       string `json:"name"`
-		High       string `json:"high"`
-		Low        string `json:"low"`
-		VarBid     string `json:"varBid"`
-		PctChange  string `json:"pctChange"`
-		Bid        string `json:"bid"`
-		Ask        string `json:"ask"`
-		Timestamp  string `json:"timestamp"`
-		CreateDate string `json:"create_date"`
+		Bid string `json:"bid"`
 	} `json:"USDBRL"`
 }
 
+var ErrTimeout = errors.New("request timeout exceeded")
+
 func ExchangeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/cotacao" {
-		w.WriteHeader(http.StatusNotFound)
+		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 	exchange, err := GetExchangeRate("USD-BRL")
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("Error fetching exchange rate: %v", err)
+		if errors.Is(err, ErrTimeout) {
+			http.Error(w, "Request Timeout", http.StatusGatewayTimeout)
+			return
+		}
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	cotacaoResponse := CotacaoResponse{Bid: exchange.Usdbrl.Bid}
-	json.NewEncoder(w).Encode(cotacaoResponse)
+	json.NewEncoder(w).Encode(exchange.Usdbrl)
 }
 
 func GetExchangeRate(currency string) (*Exchange, error) {
@@ -54,6 +46,9 @@ func GetExchangeRate(currency string) (*Exchange, error) {
 	}
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, ErrTimeout
+		}
 		return nil, err
 	}
 	defer res.Body.Close()
@@ -61,13 +56,13 @@ func GetExchangeRate(currency string) (*Exchange, error) {
 	if err != nil {
 		return nil, err
 	}
-	var c Exchange
-	err = json.Unmarshal(body, &c)
+	var exchange Exchange
+	err = json.Unmarshal(body, &exchange)
 	if err != nil {
 		return nil, err
 	}
 
-	return &c, nil
+	return &exchange, nil
 }
 
 func main() {
