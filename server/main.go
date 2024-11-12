@@ -12,7 +12,17 @@ import (
 
 type Exchange struct {
 	Usdbrl struct {
-		Bid string `json:"bid"`
+		Code       string `json:"code"`
+		Codein     string `json:"codein"`
+		Name       string `json:"name"`
+		High       string `json:"high"`
+		Low        string `json:"low"`
+		VarBid     string `json:"varBid"`
+		PctChange  string `json:"pctChange"`
+		Bid        string `json:"bid"`
+		Ask        string `json:"ask"`
+		Timestamp  string `json:"timestamp"`
+		CreateDate string `json:"create_date"`
 	} `json:"USDBRL"`
 }
 
@@ -23,24 +33,25 @@ func ExchangeHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
-	exchange, err := GetExchangeRate("USD-BRL")
+	exchange, err := GetExchangeRate()
 	if err != nil {
 		log.Printf("Error fetching exchange rate: %v", err)
 		if errors.Is(err, ErrTimeout) {
-			http.Error(w, "Request Timeout", http.StatusGatewayTimeout)
+			w.WriteHeader(http.StatusGatewayTimeout)
 			return
 		}
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(exchange.Usdbrl)
 }
 
-func GetExchangeRate(currency string) (*Exchange, error) {
+func GetExchangeRate() (*Exchange, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://economia.awesomeapi.com.br/json/last/"+currency, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://economia.awesomeapi.com.br/json/last/USD-BRL", nil)
 	if err != nil {
 		return nil, err
 	}
