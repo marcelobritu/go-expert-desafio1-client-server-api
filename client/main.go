@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -26,21 +27,36 @@ func main() {
 		panic(err)
 	}
 	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		panic(err)
+	log.Printf("statusCode %d\n", res.StatusCode)
+	if res.StatusCode == http.StatusOK {
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			panic(err)
+		}
+		var exchange Exchange
+		err = json.Unmarshal(body, &exchange)
+		if err != nil {
+			panic(err)
+		}
+		printJson(&exchange)
+		saveInFile(&exchange)
 	}
-	var exchange *Exchange
-	err = json.Unmarshal(body, &exchange)
-	if err != nil {
-		panic(err)
-	}
+}
+
+func saveInFile(exchange *Exchange) {
 	f, err := os.Create("cotacao.txt")
 	if err != nil {
 		panic(err)
 	}
 	defer f.Close()
 	_, err = f.WriteString(fmt.Sprintf("Dólar: %v", exchange.Bid))
+	if err != nil {
+		panic(err)
+	}
+}
+
+func printJson(exchange *Exchange) {
+	err := json.NewEncoder(os.Stdout).Encode(exchange)
 	if err != nil {
 		panic(err)
 	}
